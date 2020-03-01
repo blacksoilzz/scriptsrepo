@@ -1,0 +1,50 @@
+获取UP的网卡
+配置bond-slave
+配置bond
+配置IP掩码网关
+配置dns
+配置环境变量
+配置hostname
+#网卡配置为静态获取IP，删除bond配置，返回处于UP状态的网卡
+get_up_ethx(){
+	rm -f /etc/sysconfig/network-scripts/ifcfg-bond* &>/dev/null
+	sed -i 's/BOOTPROTO=.*/BOOTPROTO=static/' /etc/sysconfig/network-scripts/ifcfg-eth*
+	sed -i -e 'MASTER/d' -e '/SLAVE/d' /etc/sysconfig/network-scripts/ifcfg-eth*
+	for eth in `ls /sys/class/net/ | grep net`; do
+		ifup $eth &>/dev/null
+	done
+	sleep 4
+	ip a | grep "state UP" | awk -F: '{print $2}'| grep "eth" | xargs
+}
+
+conf_slave_ethx(){
+	local bondname=$1
+	local ethname=$2
+	rm -f /tmp/ifcfg-${ethname} &>/dev/null
+	mv /etc/sysconfig/network-scripts/ifcfg-${ethname} /tmp/ifcfg-${ethname}
+	grep -e "DEVICE" -e "HWADDR" -e "TYPE" -e "NM_CONTROLLED" -e "UUID" /tmp/ifcfg-${ethname} \
+	>/etc/sysconfig/network-scripts/ifcfg-${ethname}
+	cat << EOF >> /etc/sysconfig/network-scripts/ifcfg-${ethname}
+BOOTPROTO=static
+ONBOOT=yes
+MASTER=${bondname}
+SLAVE=yes
+USERCTL=no
+EOF
+}
+
+conf_bond(){
+	local ip=$1
+	local mask=$2
+	echo "alias bond0 bonding" > /etc/modprobe.d/bonding.conf
+	cat << EOF >> /etc/sysconfig/network-scripts/ifcfg-bond0
+BONDING_OPTS="miimon=100 mode=1"
+DEVICE=bond0
+BOOTPROTO=none
+ONBOOT=yes
+IPADDR=$ip
+NETMASK=$mask
+USERCTL=no
+TYPE=Ethernet
+EOF
+}
