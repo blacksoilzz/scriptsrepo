@@ -5,6 +5,7 @@
 配置dns
 配置环境变量
 配置hostname
+添加修改yum源配置
 #网卡配置为静态获取IP，删除bond配置，返回处于UP状态的网卡
 get_up_ethx(){
 	rm -f /etc/sysconfig/network-scripts/ifcfg-bond* &>/dev/null
@@ -18,6 +19,7 @@ get_up_ethx(){
 }
 
 conf_slave_ethx(){
+	#${bondname} ${ethname}
 	local bondname=$1
 	local ethname=$2
 	rm -f /tmp/ifcfg-${ethname} &>/dev/null
@@ -48,3 +50,52 @@ USERCTL=no
 TYPE=Ethernet
 EOF
 }
+
+conf_dns(){
+	#${DNS1} ${DNS2}
+	local DNS1=$1
+	local DNS2=$2
+	cat << EOF >>/etc/reslov.conf
+nameserver ${DNS1}
+nameserver ${DNS2}
+EOF
+}
+
+conf_hostname(){
+	#${hostname} ${ip_addr}
+	local hostname=$1
+	local ip_addr=$2
+	sed -i '/${hostname}/d' /etc/hosts
+	echo "${ip_addr}	${hostname}" > /etc/hosts
+	sed -i '/${hostname}/d' /etc/sysconfig/network
+	echo "HOSTNAME=${hostname}" >>/etc/sysconfig/network
+}
+
+conf_ip(){
+	#${ip_addr} ${netmask} ${gateway} ${ethname}
+	local ip_addr=$1
+	local netmask=$2
+	local gateway=$3
+	local ethname=$4
+	rm -f /tmp/ifcfg-${ethname} &>/dev/null
+	mv /etc/sysconfig/network-scripts/ifcfg-${ethname} /tmp/ifcfg-${ethname}
+	grep -e "DEVICE" -e "HWADDR" -e "TYPE" -e "NM_CONTROLLED" -e "UUID" /tmp/ifcfg-${ethname} \
+	> /etc/sysconfig/network-scripts/ifcfg-${ethname}
+	cat << EOF >> /etc/sysconfig/network-scripts/ifcfg-${ethname}
+BOOTPROTO=STATIC
+ONBOOT=yes
+IPADDR=$ip_addr
+NETMASK=$netmask
+USERCTL=no
+TYPE=Ethernet
+EOF
+}
+
+conf_yum_reps(){
+	#$yum_repo_url=$1
+	local yum_repo_url=$1
+	mv /etc/yum.repos.d/CentOS-Base.repo /etc/yum.repos.d/CentOS-Base.repo.bak
+	wget -O /etc/yum.repos.d/CentOS-Base.repo ${yum_repo_url}
+	yum clean all
+	yum makecache
+}	
