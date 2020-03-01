@@ -2,14 +2,13 @@
 
 DBNAME=$1
 PASSWD=$2
-SQL=$3
-
 sqlplus -S /nolog <<EOF
 conn $DBNAME/$PASSWD
-$3
+SQL语句
 exit
 EOF
 
+#-S为无提示模式
 #或者直接使用sqlplus执行命令，其中参数1参数2分别对应&1 &2
 #cat sql/test.sql/test
 #select &1 from &2
